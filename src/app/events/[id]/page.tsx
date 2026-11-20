@@ -121,7 +121,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             initialSeats={map.seats}
             mode={mode}
             csrfToken={user.csrfToken}
-            maxSelect={Math.max(0, MAX_SEATS_PER_STUDENT - myBookedCount)}
+            maxSelect={Math.max(0, MAX_SEATS_PER_STUDENT - myBookedCount - (myHold?.seats.length ?? 0))}
             myHoldId={myHold?.id ?? null}
           />
         </div>

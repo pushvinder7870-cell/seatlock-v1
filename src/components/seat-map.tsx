@@ -37,7 +37,8 @@ function seatTitle(s: SeatView) {
 }
 
 function selectableFor(mode: Mode, s: SeatView) {
-  if (mode === 'student') return s.state === 'available' || (s.state === 'held' && s.mine);
+  // Your own held seats are kept automatically when you add more, so only free seats are selectable.
+  if (mode === 'student') return s.state === 'available';
   if (mode === 'organizer') return s.state === 'available' || s.state === 'blocked';
   return false;
 }
@@ -210,8 +211,8 @@ export function SeatMap({ eventId, initialSeats, mode, csrfToken, maxSelect, myH
               <span className="text-sm text-muted-foreground">
                 {mode === 'student'
                   ? maxSelect > 0
-                    ? `Tap up to ${maxSelect} green seats.`
-                    : 'You already own the maximum of 4 seats.'
+                    ? `Tap up to ${maxSelect} green seat${maxSelect === 1 ? '' : 's'}. They're added to your hold.`
+                    : 'You have the maximum of 4 seats (held + booked).'
                   : 'Select available seats to block, or blocked seats to release.'}
               </span>
             )}

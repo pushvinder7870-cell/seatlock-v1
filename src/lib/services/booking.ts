@@ -241,26 +241,35 @@ export async function holdSeats(user: CurrentUser, eventId: string, seatNumbers:
         return { kind: 'rejected', unavailable };
       }
 
-      // 4. Business rule: booked seats + new hold <= 4.
+      // 4. Merge with the student's current (unexpired) hold: new seats are ADDED,
+      //    previously held seats are kept. Still one active hold per student per event.
+      const keptIds = ownHold && !ownHold.expired ? (prevHold?.seat_ids ?? []) : [];
+      const combinedIds = [...new Set([...keptIds, ...requested.map((r) => r.id)])];
+      const numberOf = new Map(locked.rows.map((r) => [r.id, r.seat_number]));
+      const combinedSeats = combinedIds.map((id) => numberOf.get(id)!).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+      // 5. Business rule: booked + held (after merge) <= 4. Over the limit → 422 and
+      //    NOTHING changes: the existing hold and bookings are left untouched.
       const booked = await tx.query<{ n: number }>(
         `SELECT count(*)::int AS n FROM booking_seats WHERE user_id = $1 AND event_id = $2 AND active`,
         [user.id, eventId]
       );
-      if (booked.rows[0].n + seats.length > MAX_SEATS_PER_STUDENT) {
+      if (booked.rows[0].n + combinedIds.length > MAX_SEATS_PER_STUDENT) {
+        const held = keptIds.length;
         throw new BusinessRuleError(
           'SEAT_LIMIT',
-          `You already have ${booked.rows[0].n} booked seat(s); a student may own at most ${MAX_SEATS_PER_STUDENT} per event.`,
-          { booked: booked.rows[0].n, requested: seats.length }
+          `A student may have at most ${MAX_SEATS_PER_STUDENT} seats per event. You have ${booked.rows[0].n} booked and ${held} on hold, so you can add ${Math.max(0, MAX_SEATS_PER_STUDENT - booked.rows[0].n - held)} more. Your current seats were kept.`,
+          { booked: booked.rows[0].n, held, requested: seats.length }
         );
       }
 
-      // 5. Replace the previous hold (one active hold per student per event).
+      // 6. Retire the previous hold record (its seats move into the merged hold).
       if (ownHold) {
         await tx.query(`UPDATE holds SET status = $2 WHERE id = $1`, [ownHold.id, ownHold.expired ? 'expired' : 'replaced']);
         await tx.query('UPDATE hold_seats SET active = FALSE WHERE hold_id = $1 AND active', [ownHold.id]);
       }
 
-      // 6. Create the new hold.
+      // 7. Create the merged hold (fresh 5-minute timer).
       const hold = await tx.query<{ id: string; expires_at: Date }>(
         `INSERT INTO holds (user_id, event_id, expires_at)
          VALUES ($1, $2, clock_timestamp() + make_interval(mins => $3))
@@ -271,7 +280,7 @@ export async function holdSeats(user: CurrentUser, eventId: string, seatNumbers:
       await tx.query(
         `INSERT INTO hold_seats (hold_id, seat_id, event_id)
          SELECT $1, unnest($2::uuid[]), $3`,
-        [holdId, requested.map((r) => r.id), eventId]
+        [holdId, combinedIds, eventId]
       );
       await writeAudit(
         {
@@ -280,11 +289,11 @@ export async function holdSeats(user: CurrentUser, eventId: string, seatNumbers:
           eventId,
           targetType: 'hold',
           targetId: holdId,
-          details: { seats, expiresAt: hold.rows[0].expires_at, replacedHoldId: ownHold?.id ?? null },
+          details: { seats: combinedSeats, added: seats, expiresAt: hold.rows[0].expires_at, mergedFromHoldId: ownHold?.id ?? null },
         },
         tx
       );
-      return { kind: 'ok', holdId, expiresAt: hold.rows[0].expires_at, seats, replacedHoldId: ownHold?.id ?? null };
+      return { kind: 'ok', holdId, expiresAt: hold.rows[0].expires_at, seats: combinedSeats, replacedHoldId: ownHold?.id ?? null };
     });
 
     if (result.kind === 'rejected') throw unavailableError(result.unavailable);
