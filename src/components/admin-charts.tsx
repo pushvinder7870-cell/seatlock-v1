@@ -21,7 +21,7 @@ const activityConfig = {
 export function ActivityChart({ data }: { data: AdminDashboard['hourly'] }) {
   return (
     <ChartContainer config={activityConfig} className="aspect-auto h-[280px] w-full">
-      <AreaChart data={data} margin={{ left: -16, right: 8, top: 8 }}>
+      <AreaChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
         <defs>
           {Object.keys(activityConfig).map((k) => (
             <linearGradient key={k} id={`fill-${k}`} x1="0" y1="0" x2="0" y2="1">
@@ -32,7 +32,7 @@ export function ActivityChart({ data }: { data: AdminDashboard['hourly'] }) {
         </defs>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis dataKey="hour" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} />
-        <YAxis tickLine={false} axisLine={false} allowDecimals={false} width={40} />
+        <YAxis tickLine={false} axisLine={false} allowDecimals={false} width={36} tick={{ fontSize: 11 }} />
         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
         {(['rejected', 'holds', 'bookings', 'denied'] as const).map((k) => (
           <Area key={k} dataKey={k} type="monotone" stroke={`var(--color-${k})`} strokeWidth={2} fill={`url(#fill-${k})`} />
@@ -56,7 +56,15 @@ export function OccupancyChart({ data }: { data: AdminDashboard['occupancy'] }) 
       <BarChart data={data} layout="vertical" margin={{ left: 0, right: 8 }} barSize={18}>
         <CartesianGrid horizontal={false} strokeDasharray="3 3" />
         <XAxis type="number" tickLine={false} axisLine={false} allowDecimals={false} />
-        <YAxis type="category" dataKey="event" tickLine={false} axisLine={false} width={150} tick={{ fontSize: 12 }} />
+        <YAxis
+          type="category"
+          dataKey="event"
+          tickLine={false}
+          axisLine={false}
+          width={108}
+          tick={{ fontSize: 11 }}
+          tickFormatter={(v: string) => (v.length > 16 ? `${v.slice(0, 15)}…` : v)}
+        />
         <ChartTooltip cursor={{ fill: 'var(--muted)', opacity: 0.5 }} content={<ChartTooltipContent />} />
         <ChartLegend content={<ChartLegendContent />} />
         <Bar dataKey="booked" stackId="s" fill="var(--color-booked)" radius={[4, 0, 0, 4]} />
@@ -122,7 +130,15 @@ export function ActionsChart({ data }: { data: AdminDashboard['actions'] }) {
     <ChartContainer config={actionsConfig} className="aspect-auto w-full" style={{ height: Math.max(160, rows.length * 30 + 20) }}>
       <BarChart data={rows} layout="vertical" margin={{ left: 0, right: 24 }} barSize={14}>
         <XAxis type="number" hide />
-        <YAxis type="category" dataKey="action" tickLine={false} axisLine={false} width={150} tick={{ fontSize: 11, fontFamily: 'var(--font-geist-mono)' }} />
+        <YAxis
+          type="category"
+          dataKey="action"
+          tickLine={false}
+          axisLine={false}
+          width={118}
+          tick={{ fontSize: 10, fontFamily: 'var(--font-geist-mono)' }}
+          tickFormatter={(v: string) => (v.length > 17 ? `${v.slice(0, 16)}…` : v)}
+        />
         <ChartTooltip cursor={{ fill: 'var(--muted)', opacity: 0.5 }} content={<ChartTooltipContent hideLabel />} />
         <Bar dataKey="count" radius={4} label={{ position: 'right', fontSize: 11, className: 'fill-muted-foreground' }}>
           {rows.map((r) => (

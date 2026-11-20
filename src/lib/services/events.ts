@@ -6,6 +6,7 @@ import { deny, requireRole } from './authz';
 import { writeAudit } from './audit';
 import { parseLocal } from '../time';
 import { notifyMany } from './notifications';
+import { assertOwnImageUrl } from './storage';
 
 export const MAX_SEATS_PER_STUDENT = 4;
 export const HOLD_MINUTES = 5;
@@ -24,6 +25,7 @@ export type EventRow = {
   total_seats: number;
   version: number;
   updated_at: Date;
+  image_url: string | null;
 };
 
 export type EventSummary = EventRow & {
@@ -56,7 +58,7 @@ export function isBookingOpen(e: Pick<EventRow, 'status' | 'event_date'>) {
 
 const EVENT_COLUMNS = `
   e.id, e.organizer_id, o.name AS organizer_name, e.name, e.description, e.venue,
-  e.event_date, e.status, e.total_seats, e.version, e.updated_at`;
+  e.event_date, e.status, e.total_seats, e.version, e.updated_at, e.image_url`;
 
 async function loadEvent(eventId: string): Promise<EventRow | undefined> {
   assertUuid(eventId, 'event');
@@ -195,6 +197,7 @@ export type EventInput = {
   venue?: string;
   eventDate: string;
   status: EventStatus;
+  imageUrl?: string;
 };
 
 function validateEventInput(input: EventInput) {
@@ -209,6 +212,7 @@ function validateEventInput(input: EventInput) {
     venue: (input.venue ?? '').trim() || null,
     event_date: date,
     status: input.status,
+    image_url: assertOwnImageUrl(input.imageUrl),
   };
 }
 
@@ -225,9 +229,9 @@ export async function createEvent(
 
   return withTransaction(async (tx) => {
     const { rows: ev } = await tx.query<{ id: string }>(
-      `INSERT INTO events (organizer_id, name, description, venue, event_date, status, total_seats)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [user.id, v.name, v.description, v.venue, v.event_date, v.status, rows * perRow]
+      `INSERT INTO events (organizer_id, name, description, venue, event_date, status, total_seats, image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [user.id, v.name, v.description, v.venue, v.event_date, v.status, rows * perRow, v.image_url]
     );
     const id = ev[0].id;
     await tx.query(
@@ -264,11 +268,11 @@ export async function updateEvent(user: CurrentUser, eventId: string, input: Eve
   return withTransaction(async (tx) => {
     const { rows } = await tx.query<{ version: number }>(
       `UPDATE events
-          SET name = $3, description = $4, venue = $5, event_date = $6, status = $7,
+          SET name = $3, description = $4, venue = $5, event_date = $6, status = $7, image_url = $8,
               version = version + 1, updated_at = now()
         WHERE id = $1 AND version = $2
         RETURNING version`,
-      [eventId, expectedVersion, v.name, v.description, v.venue, v.event_date, v.status]
+      [eventId, expectedVersion, v.name, v.description, v.venue, v.event_date, v.status, v.image_url]
     );
     if (!rows[0]) {
       const latest = await tx.query<{ version: number }>('SELECT version FROM events WHERE id = $1', [eventId]);
@@ -286,6 +290,7 @@ export async function updateEvent(user: CurrentUser, eventId: string, input: Eve
       venue: current.venue,
       event_date: new Date(current.event_date).toISOString(),
       status: current.status,
+      image_url: current.image_url,
     };
     const after: Record<string, unknown> = { ...v, event_date: v.event_date.toISOString() };
     for (const k of Object.keys(after)) if (before[k] !== after[k]) changes[k] = { from: before[k], to: after[k] };

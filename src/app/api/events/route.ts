@@ -10,6 +10,7 @@ export const POST = apiRoute(async ({ user, body }) => {
     venue: str(body, 'venue'),
     eventDate: str(body, 'eventDate'),
     status: (str(body, 'status') || 'draft') as EventStatus,
+    imageUrl: str(body, 'imageUrl') || undefined,
     rows: Number(str(body, 'rows')),
     seatsPerRow: Number(str(body, 'seatsPerRow')),
   });

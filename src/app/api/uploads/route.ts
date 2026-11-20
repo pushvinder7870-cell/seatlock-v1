@@ -11,9 +11,11 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
     if (!verifyCsrf(user.sessionId, req.headers.get('x-csrf-token'))) throw new ForbiddenError('Missing or invalid CSRF token.');
-    const file = (await req.formData()).get('file');
+    const form = await req.formData();
+    const file = form.get('file');
     if (!(file instanceof File)) throw new ValidationError('No file uploaded.');
-    return Response.json(await uploadImage(user, file), { status: 201 });
+    const kind = form.get('kind') === 'event' ? 'event' : 'post';
+    return Response.json(await uploadImage(user, file, kind), { status: 201 });
   } catch (e) {
     return errorResponse(e, false, '/community');
   }

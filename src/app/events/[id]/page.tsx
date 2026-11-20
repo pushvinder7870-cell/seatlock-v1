@@ -37,6 +37,13 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
 
   return (
     <>
+      {event.image_url && (
+        <div className="relative mb-6 overflow-hidden rounded-2xl border shadow-lg shadow-primary/10">
+          {/* eslint-disable-next-line @next/next/no-img-element -- our own stored image */}
+          <img src={event.image_url} alt={`${event.name} cover`} className="aspect-[16/6] max-h-80 w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+        </div>
+      )}
       <PageHeader
         eyebrow={p.long}
         title={event.name}

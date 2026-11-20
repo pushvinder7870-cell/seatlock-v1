@@ -7,7 +7,7 @@ import { writeAudit } from './audit';
 import { LIMITS, hit } from './ratelimit';
 import { assertUuid } from './events';
 import { notify } from './notifications';
-import { publicImagePrefix } from './storage';
+import { assertOwnImageUrl } from './storage';
 
 /*
  * Community board.
@@ -130,19 +130,9 @@ export async function communityStats(user: CurrentUser) {
   return rows[0];
 }
 
-/** Only images we stored ourselves (our Supabase bucket) may be attached: no arbitrary/tracking URLs. */
-function validateImageUrl(url: string | undefined): string | null {
-  if (!url) return null;
-  const prefix = publicImagePrefix();
-  if (!prefix || !url.startsWith(prefix) || !/^[\w\-/.]+$/.test(url.slice(prefix.length))) {
-    throw new ValidationError('Invalid image.');
-  }
-  return url;
-}
-
 export async function createPost(user: CurrentUser, input: { body: string; eventId?: string; imageUrl?: string }) {
   const body = cleanText(input.body, 2000, 'Post');
-  const imageUrl = validateImageUrl(input.imageUrl);
+  const imageUrl = assertOwnImageUrl(input.imageUrl);
   let eventId: string | null = null;
   if (input.eventId) {
     assertUuid(input.eventId, 'event');

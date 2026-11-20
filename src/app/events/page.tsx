@@ -47,6 +47,21 @@ function EventCard({ e, showOrganizer }: { e: EventSummary; showOrganizer: boole
   return (
     <Link href={`/events/${e.id}`} className="group block focus-visible:outline-none">
       <Card className="h-full gap-0 py-0 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-xl group-hover:shadow-primary/10 group-hover:ring-primary/30 group-focus-visible:ring-2 group-focus-visible:ring-ring">
+        <div className={`relative h-36 overflow-hidden ${!e.booking_open ? 'grayscale' : ''}`}>
+          {e.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- our own stored image
+            <img src={e.image_url} alt="" loading="lazy" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          ) : (
+            <div className="brand-gradient size-full opacity-90">
+              <div
+                className="size-full opacity-30"
+                style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1.5px, transparent 0)', backgroundSize: '16px 16px' }}
+              />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-transparent" />
+          <span className="absolute bottom-2.5 left-4 text-xs font-medium text-white/90 drop-shadow">{e.venue ?? 'Venue TBA'}</span>
+        </div>
         <div className="flex gap-4 p-5">
           <DateTile date={e.event_date} className={!e.booking_open ? 'opacity-50 grayscale' : ''} />
           <div className="min-w-0 flex-1">

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ActionForm, SubmitButton } from './action-form';
 import { FormMeta, NativeSelect } from './common';
+import { ImageField } from './image-field';
 
 function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -52,6 +53,9 @@ export function EventForm({ user, event }: { user: CurrentUser; event?: EventRow
               </AlertDescription>
             </Alert>
           )}
+          <Field id="cover" label="Cover photo" hint="Shown on the event card and as the banner on the seat-map page.">
+            <ImageField csrfToken={user.csrfToken} initialUrl={event?.image_url} />
+          </Field>
           <Field id="name" label="Event name">
             <Input id="name" name="name" required maxLength={255} defaultValue={event?.name} placeholder="Fest Headline Night" />
           </Field>

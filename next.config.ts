@@ -52,6 +52,11 @@ const nextConfig: NextConfig = {
     authInterrupts: true, // enables forbidden() -> HTTP 403 + app/forbidden.tsx
   },
   poweredByHeader: false,
+  // Dev only: let phones/tablets on the same Wi-Fi open the dev server via its
+  // LAN IP (e.g. http://10.96.x.x:3000). Without this Next.js blocks its dev JS
+  // for those origins, so client components (charts, toasts, live refresh)
+  // never load on the device. Has no effect on production builds.
+  allowedDevOrigins: ["10.*.*.*", "192.168.*.*", "172.*.*.*", "*.local"],
   serverExternalPackages: ["pg"],
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
