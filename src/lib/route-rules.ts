@@ -43,7 +43,13 @@ export const ROUTE_RULES: RouteRule[] = [
   { pattern: new RegExp(`^/api/bookings/${UUID}/cancel$`), roles: ['student'] },
 ];
 
-export const PUBLIC_PATHS = [/^\/login$/, /^\/api\/auth\/login$/, /^\/api\/health$/];
+export const PUBLIC_PATHS = [
+  /^\/$/, // public landing page (published events only)
+  /^\/login$/,
+  /^\/api\/auth\/login$/,
+  /^\/api\/health$/,
+  /^\/api\/images\/[0-9a-fA-F-]{36}$/, // stored images (unguessable random ids) so cover photos show on the landing page
+];
 
 export function matchRule(pathname: string, method: string): RouteRule | undefined {
   return ROUTE_RULES.find(

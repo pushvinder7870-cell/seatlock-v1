@@ -37,7 +37,7 @@ export function DescriptionField({ defaultValue, csrfToken, aiEnabled }: { defau
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.message ?? 'AI could not write a description.');
       setValue(json.description);
-      toast.success('Draft written. Edit it as you like before saving.');
+      toast.success(json.source === 'claude' ? 'Claude wrote a draft. Edit it as you like before saving.' : 'Draft written (offline template). Edit it before saving.');
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -56,11 +56,11 @@ export function DescriptionField({ defaultValue, csrfToken, aiEnabled }: { defau
         onChange={(e) => setValue(e.target.value)}
         placeholder="What's the show about? Or type a few notes and let AI write it."
       />
-      <Button type="button" variant="outline" size="sm" onClick={write} disabled={!aiEnabled || pending} className="text-primary">
+      <Button type="button" variant="outline" size="sm" onClick={write} disabled={pending} className="text-primary">
         {pending ? <Loader2Icon className="animate-spin" /> : <SparklesIcon />}
         {pending ? 'Writing…' : 'Write with AI'}
       </Button>
-      {!aiEnabled && <span className="ml-2 text-xs text-muted-foreground">AI not configured</span>}
+      {!aiEnabled && <span className="ml-2 text-xs text-muted-foreground">offline template mode</span>}
     </div>
   );
 }

@@ -31,10 +31,12 @@ import {
 import { initials } from '@/lib/format';
 import { LogoMark } from './logo';
 import { LogoutMenuItem, NAV, RoleBadge, isActive, type Role } from './site-nav';
+import { ConfettiButton, NextShowCard, QuickStats, TipCarousel } from './sidebar-extras';
+import type { SidebarInfo } from '@/lib/services/sidebar';
 
 type SidebarUser = { name: string; email: string; role: Role; csrfToken: string };
 
-export function AppSidebar({ user, home }: { user: SidebarUser; home: string }) {
+export function AppSidebar({ user, home, info, serverNow }: { user: SidebarUser; home: string; info: SidebarInfo; serverNow: string }) {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
   const { setTheme } = useTheme();
@@ -78,12 +80,13 @@ export function AppSidebar({ user, home }: { user: SidebarUser; home: string }) 
           </SidebarGroup>
         ))}
 
-        <SidebarGroup className="mt-auto group-data-[collapsible=icon]:hidden">
-          <div className="rounded-xl border bg-gradient-to-br from-primary/10 to-fuchsia-500/10 p-3 text-xs">
-            <div className="flex items-center gap-1.5 font-medium">
-              <ShieldCheckIcon className="size-3.5 text-primary" /> Secured session
-            </div>
-            <p className="mt-1 text-muted-foreground">Row-locked bookings · 2-layer RBAC · every action audited.</p>
+        <SidebarGroup className="mt-auto space-y-2.5 group-data-[collapsible=icon]:hidden">
+          {info.next && <NextShowCard next={info.next} serverNow={serverNow} />}
+          <QuickStats stats={info.stats} />
+          <TipCarousel role={user.role} />
+          <ConfettiButton />
+          <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+            <ShieldCheckIcon className="size-3 text-primary" /> Row-locked · 2-layer RBAC · audited
           </div>
         </SidebarGroup>
       </SidebarContent>

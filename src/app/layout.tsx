@@ -8,8 +8,9 @@ import { AppSidebar, TopbarTitle } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/site-nav";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { MobileNav } from "@/components/mobile-nav";
-import { AssistantWidget } from "@/components/assistant-widget";
+import { AssistantTrigger, AssistantWidget } from "@/components/assistant-widget";
 import { aiEnabled } from "@/lib/ai/claude";
+import { getSidebarInfo } from "@/lib/services/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import "./globals.css";
@@ -44,16 +45,22 @@ async function Shell({ children }: { children: React.ReactNode }) {
   if (!user) return <>{children}</>;
 
   const sidebarOpen = (await cookies()).get("sidebar_state")?.value !== "false";
+  const sidebarInfo = await getSidebarInfo(user);
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>
-      <AppSidebar user={{ name: user.name, email: user.email, role: user.role, csrfToken: user.csrfToken }} home={homeFor(user.role)} />
+      <AppSidebar
+        user={{ name: user.name, email: user.email, role: user.role, csrfToken: user.csrfToken }}
+        home={homeFor(user.role)}
+        info={sidebarInfo}
+        serverNow={new Date().toISOString()}
+      />
       <SidebarInset className="page-glow min-w-0">
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/70 px-3 backdrop-blur-xl sm:px-4 md:rounded-t-xl">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
           <TopbarTitle role={user.role} />
           <div className="ml-auto flex items-center gap-0.5">
-            <AssistantWidget csrfToken={user.csrfToken} firstName={user.name.split(' ')[0]} role={user.role} enabled={aiEnabled()} />
+            <AssistantTrigger />
             <NotificationsBell csrfToken={user.csrfToken} />
             <ThemeToggle />
           </div>
@@ -62,6 +69,8 @@ async function Shell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto w-full max-w-7xl flex-1 px-4 pt-6 pb-28 sm:px-6 sm:pt-8 md:pb-8">{children}</div>
       </SidebarInset>
       <MobileNav role={user.role} />
+      {/* Rendered outside the blurred top bar (backdrop-filter breaks fixed positioning inside it) */}
+      <AssistantWidget csrfToken={user.csrfToken} firstName={user.name.split(' ')[0]} role={user.role} claude={aiEnabled()} />
     </SidebarProvider>
   );
 }

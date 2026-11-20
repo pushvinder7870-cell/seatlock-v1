@@ -160,7 +160,15 @@ We call **Claude Opus 5.5** through Anthropic's official TypeScript SDK (`@anthr
 * the server-side **refusal fallback** (`fallbacks: "default"`) retries automatically if Claude declines on safety grounds;
 * the API key stays on the server and is never sent to the browser.
 
-Without `ANTHROPIC_API_KEY`, the AI features show "not configured" instead of failing.
+**Knowledge seed + offline brain (works with no API key).**
+* `src/lib/ai/knowledge.ts` is the **knowledge seed**: around 40 facts about every part of SeatLock, each tagged by role. Claude receives it in its prompt.
+* Without a key, or if Claude is down, `src/lib/ai/local-brain.ts` answers instead:
+  1. **Intent rules over live data:** "what's on", "cheapest", "seats left", "best selling", "my tickets", or a show named by its title (matched by word overlap).
+  2. **TF-IDF + cosine similarity** for how-to questions. Each knowledge entry becomes a vector of word weights, `tf × idf`, where `idf = log((N+1)/(df+1)) + 1` makes rare, specific words like "refund" count more than common ones. The question becomes a vector the same way. The entry with the highest cosine similarity (the angle between the vectors) wins.
+* Offline **review summaries** use a **TextRank-style extractive summary**: every review sentence is scored by how similar it is to all the other sentences, and the 2 most central (most representative) sentences are quoted with the average rating.
+* **Voice:** 🔊 reads answers aloud (the browser's `speechSynthesis`), and 🎤 lets you ask by voice (`SpeechRecognition`, in Chrome and Edge).
+
+Each answer is labelled "Claude" or "SeatLock offline brain".
 
 ### 3.13 Demo payments: the Luhn checksum
 **Where:** `src/lib/services/payments.ts`. No real money moves.

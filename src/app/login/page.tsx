@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { LockKeyholeIcon, ScrollTextIcon, ShieldCheckIcon, TimerIcon } from 'lucide-react';
 import { getCurrentUser } from '@/lib/session';
@@ -82,7 +83,10 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
       </section>
 
       <section className="relative flex items-center justify-center px-5 py-10 lg:overflow-y-auto">
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 left-4 flex items-center justify-between">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
+            ← Home
+          </Link>
           <ThemeToggle />
         </div>
         <div className="w-full max-w-md">

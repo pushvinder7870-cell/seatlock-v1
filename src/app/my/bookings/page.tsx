@@ -69,7 +69,11 @@ function Ticket({ b, user }: { b: BookingView; user: CurrentUser }) {
           <Link href={`/tickets/${b.id}`}>View ticket</Link>
         </Button>
         {b.can_cancel && (
-          <ActionForm action={`/api/bookings/${b.id}/cancel`} confirm={`Cancel your booking for ${b.event_name} (${b.seats.join(', ')})?`}>
+          <ActionForm
+            action={`/api/bookings/${b.id}/cancel`}
+            confirm={`Cancel your booking for ${b.event_name} (${b.seats.join(', ')})?${b.paid_cents ? ` You'll get a ${formatINR(b.paid_cents)} demo refund.` : ''}`}
+            confirmLabel="Yes, cancel"
+          >
             <FormMeta user={user} redirect="/my/bookings" />
             <SubmitButton variant="destructive" size="sm">
               <XIcon /> Cancel

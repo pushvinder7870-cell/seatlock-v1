@@ -24,11 +24,14 @@ export function ActionForm({
   onSuccess,
   onError,
   stay = false,
+  confirmLabel = 'Yes',
 }: {
   action: string;
   children: ReactNode;
   className?: string;
+  /** Ask for confirmation (in-app toast with Yes/Keep) before submitting. */
   confirm?: string;
+  confirmLabel?: string;
   /** Stay on the current page after success (just refresh data) instead of following the server's redirect. */
   stay?: boolean;
   onSuccess?: (result: ActionResult) => void;
@@ -38,12 +41,25 @@ export function ActionForm({
   const pathname = usePathname();
   const [pending, setPending] = useState(false);
 
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (pending) return;
-    if (confirm && !window.confirm(confirm)) return;
     const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     const data = new FormData(e.currentTarget, submitter);
+    if (confirm) {
+      // In-app confirmation toast instead of the browser's confirm() dialog.
+      toast.warning(confirm, {
+        id: `confirm-${action}`,
+        duration: 12000,
+        action: { label: confirmLabel, onClick: () => void submit(data) },
+        cancel: { label: 'Keep', onClick: () => {} },
+      });
+      return;
+    }
+    void submit(data);
+  }
+
+  async function submit(data: FormData) {
     setPending(true);
     try {
       const res = await fetch(action, {
