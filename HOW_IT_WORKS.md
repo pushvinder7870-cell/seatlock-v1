@@ -130,7 +130,7 @@ We call **Claude Opus 5.5** through Anthropic's official TypeScript SDK (`@anthr
 
 | Feature | Who | What it does |
 | --- | --- | --- |
-| **Ask SeatLock** (chat bubble, ✨ on phones) | everyone | Answers questions like "which show is cheapest?" or "what tickets do I have?", with links to the right page |
+| **Ask SeatLock** (✨ Ask AI button in the top bar) | everyone | Answers questions like "which show is cheapest?" or "what tickets do I have?", with links to the right page |
 | **AI review summary** (Reviews page, pick an event) | everyone | Summarizes all reviews of an event in 2–3 sentences |
 | **Write with AI** (event form) | organizers | Drafts an event description from the name, venue, date and price |
 
@@ -154,7 +154,7 @@ We call **Claude Opus 5.5** through Anthropic's official TypeScript SDK (`@anthr
 **Review summary caching:** we hash the event's reviews (`sha256` of each review id + edit time). If the hash matches the stored one in `ai_summaries`, we reuse the summary: **no AI call, no cost**. A new or edited review changes the hash, so a fresh summary is generated.
 
 **Safety and cost controls:**
-* each user gets 20 AI requests per 10 minutes (the same Postgres rate limiter);
+* each user gets 30 AI requests per 10 minutes (the same Postgres rate limiter);
 * input length is capped;
 * the effort level is "low" for short, fast answers;
 * the server-side **refusal fallback** (`fallbacks: "default"`) retries automatically if Claude declines on safety grounds;
