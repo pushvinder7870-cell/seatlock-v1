@@ -307,6 +307,9 @@ curl -b jar -H 'content-type: application/json' -H 'x-csrf-token: <TOKEN>' \
    | `APP_TIME_ZONE` | `Asia/Kolkata` |
    | `SUPABASE_URL` | *(optional)* `https://xxxx.supabase.co` |
    | `SUPABASE_SERVICE_ROLE_KEY` | *(optional)* service_role key. **Never** prefix it with `NEXT_PUBLIC_`. |
+   | `ANTHROPIC_API_KEY` | *(optional, enables AI)* key from console.anthropic.com. Server-side only. |
+
+   Images work without Supabase Storage: uploads are then stored in PostgreSQL and served from `/api/images/<id>`. Add the two `SUPABASE_*` variables only if you prefer Supabase Storage, and create a **public** bucket named `post-images` first.
 
 3. Click **Deploy**. When it's live, open `https://<app>.vercel.app/api/health`. It should return `{"ok":true,"db":"up"}`.
 4. Prove it works on the internet: `node scripts/load-test.mjs --base https://<app>.vercel.app --students 40` (set `DATABASE_URL`/`DATABASE_SSL` in the same shell to also get the DB invariant checks).
@@ -327,7 +330,8 @@ curl -b jar -H 'content-type: application/json' -H 'x-csrf-token: <TOKEN>' \
 | `JWT_SECRET` | ✓ | long random string (signs session + CSRF tokens) |
 | `DATABASE_SSL` | | `require` (verified TLS) or `no-verify` (Supabase); unset locally |
 | `DB_POOL_MAX` | | default 30; use 5 on Vercel |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET` | | enable image uploads (bucket default `post-images`) |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET` | | store uploaded images in Supabase Storage (bucket default `post-images`); without them images are stored in PostgreSQL |
+| `ANTHROPIC_API_KEY` | | enables the AI features (Ask SeatLock assistant, review summaries, "Write with AI") using Claude Opus 5.5 |
 | `COOKIE_SECURE` | | defaults to `true` in production; `false` only for plain-HTTP demos |
 | `APP_TIME_ZONE` | | default `Asia/Kolkata` |
 

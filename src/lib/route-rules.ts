@@ -16,6 +16,9 @@ export const ROUTE_RULES: RouteRule[] = [
   { pattern: /^\/admin(\/|$)/, roles: ['admin'] },
   { pattern: /^\/api\/admin(\/|$)/, roles: ['admin'] },
 
+  // AI: drafting event descriptions is an organizer tool
+  { pattern: /^\/api\/ai\/describe$/, roles: ['organizer'] },
+
   // Community moderation: pinning is admin-only (deleting is checked per-owner in the service)
   { pattern: new RegExp(`^/api/posts/${UUID}/pin$`), roles: ['admin'] },
 

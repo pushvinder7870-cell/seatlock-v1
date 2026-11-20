@@ -8,6 +8,8 @@ import { AppSidebar, TopbarTitle } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/site-nav";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { MobileNav } from "@/components/mobile-nav";
+import { AssistantWidget } from "@/components/assistant-widget";
+import { aiEnabled } from "@/lib/ai/claude";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import "./globals.css";
@@ -51,6 +53,7 @@ async function Shell({ children }: { children: React.ReactNode }) {
           <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
           <TopbarTitle role={user.role} />
           <div className="ml-auto flex items-center gap-0.5">
+            <AssistantWidget csrfToken={user.csrfToken} firstName={user.name.split(' ')[0]} role={user.role} enabled={aiEnabled()} />
             <NotificationsBell csrfToken={user.csrfToken} />
             <ThemeToggle />
           </div>

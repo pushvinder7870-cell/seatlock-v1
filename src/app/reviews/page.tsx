@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { BadgeCheckIcon, MessageSquareQuoteIcon, StarIcon, Trash2Icon } from 'lucide-react';
+import { BadgeCheckIcon, MessageSquareQuoteIcon, SparklesIcon, StarIcon, Trash2Icon } from 'lucide-react';
+import { aiEnabled } from '@/lib/ai/claude';
+import { AiReviewSummary } from '@/components/ai-review-summary';
 import { requireUser, guard } from '@/lib/page';
 import { listReviews, ratingSummaries, reviewableEvents } from '@/lib/services/reviews';
 import { initials, timeAgo } from '@/lib/format';
@@ -78,6 +80,18 @@ export default async function ReviewsPage({ searchParams }: PageProps<'/reviews'
                 );
               })}
             </div>
+          )}
+
+          {selected ? (
+            selected.count >= 2 && (
+              <AiReviewSummary key={selected.event_id} eventId={selected.event_id} eventName={selected.event_name} csrfToken={user.csrfToken} enabled={aiEnabled()} />
+            )
+          ) : (
+            ratings.length > 0 && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <SparklesIcon className="size-3.5 text-primary" /> Tip: pick an event above to get an AI summary of its reviews.
+              </p>
+            )
           )}
 
           <div className="flex items-center justify-between">

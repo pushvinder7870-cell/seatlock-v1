@@ -7,10 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { ActionForm, SubmitButton } from './action-form';
 import { FormMeta, NativeSelect } from './common';
 import { ImageField } from './image-field';
+import { DescriptionField } from './description-field';
+import { aiEnabled } from '@/lib/ai/claude';
 
 function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -60,7 +61,7 @@ export function EventForm({ user, event }: { user: CurrentUser; event?: EventRow
             <Input id="name" name="name" required maxLength={255} defaultValue={event?.name} placeholder="Fest Headline Night" />
           </Field>
           <Field id="description" label="Description">
-            <Textarea id="description" name="description" rows={3} defaultValue={event?.description ?? ''} placeholder="What's the show about?" />
+            <DescriptionField defaultValue={event?.description ?? ''} csrfToken={user.csrfToken} aiEnabled={aiEnabled()} />
           </Field>
           <div className="grid gap-6 sm:grid-cols-2">
             <Field id="venue" label="Venue">
