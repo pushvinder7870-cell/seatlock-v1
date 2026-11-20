@@ -18,6 +18,7 @@ export const NOTICES: Record<string, string> = {
   post_unpinned: 'Post unpinned.',
   comment_created: 'Comment added.',
   comment_deleted: 'Comment removed.',
+  payment_success: 'Payment successful! Your seats are booked. 🎉',
   review_saved: 'Thanks! Your review is live.',
   review_deleted: 'Review removed.',
 };

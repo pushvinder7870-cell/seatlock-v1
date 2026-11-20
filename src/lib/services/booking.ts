@@ -15,6 +15,16 @@ import { deny, requireRole } from './authz';
 import { writeAudit } from './audit';
 import { notify } from './notifications';
 import {
+  computeAmounts,
+  formatINR,
+  getCheckout,
+  paymentRateLimit,
+  recordDecline,
+  verifyPayment,
+  type PaymentInput,
+  type VerifiedPayment,
+} from './payments';
+import {
   HOLD_MINUTES,
   MAX_SEATS_PER_STUDENT,
   assertUuid,
@@ -332,12 +342,29 @@ async function loadHold(user: CurrentUser, holdId: string, operation: string) {
  * Confirm the student's own, unexpired hold into a booking.
  * Idempotent: confirming an already-confirmed hold returns the same booking.
  */
-export async function confirmHold(user: CurrentUser, holdId: string) {
+/**
+ * Demo checkout: validate the (fake) card/UPI details, then pay + confirm in
+ * one transaction via confirmHold(). Free events skip payment. Re-submitting a
+ * hold that's already confirmed returns the same booking (idempotent).
+ */
+export async function payAndConfirm(user: CurrentUser, holdId: string, input: PaymentInput) {
+  await requireRole(user, ['student'], { action: 'payAndConfirm', targetType: 'hold', targetId: holdId });
+  const hold = await loadHold(user, holdId, 'payAndConfirm');
+  if (hold.status === 'confirmed') return confirmHold(user, holdId);
+  const checkout = await getCheckout(user, holdId);
+  if (checkout.unitCents === 0) return confirmHold(user, holdId);
+  await paymentRateLimit(user);
+  const v = verifyPayment(input);
+  if (!v.ok) throw await recordDecline(user, checkout, v.payment, v.reason);
+  return confirmHold(user, holdId, v.payment);
+}
+
+export async function confirmHold(user: CurrentUser, holdId: string, payment?: VerifiedPayment) {
   await requireRole(user, ['student'], { action: 'confirmHold', targetType: 'hold', targetId: holdId });
   const hold = await loadHold(user, holdId, 'confirmHold');
 
   type R =
-    | { kind: 'ok'; bookingId: string; seats: string[]; alreadyConfirmed: boolean }
+    | { kind: 'ok'; bookingId: string; seats: string[]; alreadyConfirmed: boolean; receiptNo: string | null; amountCents: number }
     | { kind: 'expired' };
 
   const result = await withTransaction<R>(async (tx) => {
@@ -350,9 +377,9 @@ export async function confirmHold(user: CurrentUser, holdId: string) {
         FOR UPDATE OF s`,
       [holdId]
     );
-    const h = await tx.query<{ status: string; expired: boolean; open: boolean }>(
+    const h = await tx.query<{ status: string; expired: boolean; open: boolean; price_cents: number }>(
       `SELECT h.status, h.expires_at <= clock_timestamp() AS expired,
-              (e.status = 'published' AND e.event_date > clock_timestamp()) AS open
+              (e.status = 'published' AND e.event_date > clock_timestamp()) AS open, e.price_cents
          FROM holds h JOIN events e ON e.id = h.event_id
         WHERE h.id = $1
         FOR UPDATE OF h`,
@@ -362,8 +389,14 @@ export async function confirmHold(user: CurrentUser, holdId: string) {
     const seatNumbers = seats.rows.map((s) => s.seat_number).sort();
 
     if (cur.status === 'confirmed') {
-      const b = await tx.query<{ id: string }>('SELECT id FROM bookings WHERE hold_id = $1', [holdId]);
-      return { kind: 'ok', bookingId: b.rows[0].id, seats: seatNumbers, alreadyConfirmed: true };
+      const b = await tx.query<{ id: string; receipt_no: string | null; amount_cents: number | null }>(
+        `SELECT b.id, p.receipt_no, p.amount_cents FROM bookings b
+           LEFT JOIN payments p ON p.booking_id = b.id AND p.status IN ('paid', 'refunded')
+          WHERE b.hold_id = $1`,
+        [holdId]
+      );
+      const r = b.rows[0];
+      return { kind: 'ok', bookingId: r.id, seats: seatNumbers, alreadyConfirmed: true, receiptNo: r.receipt_no, amountCents: r.amount_cents ?? 0 };
     }
     if (cur.status !== 'active') {
       throw new ConflictError('HOLD_NOT_ACTIVE', `This hold is no longer active (${cur.status}). Please select seats again.`);
@@ -373,6 +406,9 @@ export async function confirmHold(user: CurrentUser, holdId: string) {
       return { kind: 'expired' }; // commit the expiry + audit, then report 409
     }
     if (!cur.open) throw new ConflictError('BOOKING_CLOSED', 'Booking for this event is closed.');
+    if (cur.price_cents > 0 && !payment) {
+      throw new AppError(402, 'PAYMENT_REQUIRED', 'This is a paid event. Please complete checkout to confirm your seats.');
+    }
     if (seats.rows.some((s) => s.is_blocked)) {
       throw new ConflictError('SEATS_UNAVAILABLE', 'One of the held seats was blocked by the organizer.');
     }
@@ -401,6 +437,31 @@ export async function confirmHold(user: CurrentUser, holdId: string) {
     );
     await tx.query(`UPDATE holds SET status = 'confirmed' WHERE id = $1`, [holdId]);
     await tx.query('UPDATE hold_seats SET active = FALSE WHERE hold_id = $1', [holdId]);
+
+    // Paid event: record the (demo) payment in the SAME transaction as the booking.
+    let receiptNo: string | null = null;
+    let amountCents = 0;
+    if (cur.price_cents > 0 && payment) {
+      const a = computeAmounts(cur.price_cents, seats.rows.length);
+      amountCents = a.total;
+      receiptNo = payment.receiptNo;
+      await tx.query(
+        `INSERT INTO payments (receipt_no, user_id, event_id, hold_id, booking_id, seats, unit_cents, fee_cents, amount_cents, method, card_brand, card_last4, upi_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'paid')`,
+        [receiptNo, user.id, hold.event_id, holdId, bookingId, seats.rows.length, cur.price_cents, a.fee, a.total, payment.method, payment.brand, payment.last4, payment.upiId]
+      );
+      await writeAudit(
+        {
+          action: 'PAYMENT_CAPTURED',
+          actor: actorOf(user),
+          eventId: hold.event_id,
+          targetType: 'booking',
+          targetId: bookingId,
+          details: { receiptNo, amount: a.total, method: payment.method, brand: payment.brand, last4: payment.last4 },
+        },
+        tx
+      );
+    }
     await writeAudit(
       {
         action: 'BOOKING_CONFIRMED',
@@ -408,15 +469,21 @@ export async function confirmHold(user: CurrentUser, holdId: string) {
         eventId: hold.event_id,
         targetType: 'booking',
         targetId: bookingId,
-        details: { holdId, seats: seatNumbers },
+        details: { holdId, seats: seatNumbers, paid: amountCents },
       },
       tx
     );
     await notify(
-      { userId: user.id, type: 'booking_confirmed', title: `Booking confirmed: ${seatNumbers.join(', ')}`, body: 'Your tickets are in My tickets.', link: '/my/bookings' },
+      {
+        userId: user.id,
+        type: 'booking_confirmed',
+        title: `Booking confirmed: ${seatNumbers.join(', ')}`,
+        body: amountCents ? `Paid ${formatINR(amountCents)} · receipt ${receiptNo}. Your ticket is ready.` : 'Your tickets are in My tickets.',
+        link: `/tickets/${bookingId}`,
+      },
       tx
     );
-    return { kind: 'ok', bookingId, seats: seatNumbers, alreadyConfirmed: false };
+    return { kind: 'ok', bookingId, seats: seatNumbers, alreadyConfirmed: false, receiptNo, amountCents };
   });
 
   if (result.kind === 'expired') {
@@ -427,6 +494,8 @@ export async function confirmHold(user: CurrentUser, holdId: string) {
     seats: result.seats,
     alreadyConfirmed: result.alreadyConfirmed,
     eventId: hold.event_id,
+    receiptNo: result.receiptNo,
+    amountCents: result.amountCents,
   };
 }
 
@@ -488,6 +557,21 @@ export async function cancelBooking(user: CurrentUser, bookingId: string) {
 
     await tx.query(`UPDATE bookings SET status = 'cancelled', cancelled_at = now() WHERE id = $1`, [bookingId]);
     await tx.query('UPDATE booking_seats SET active = FALSE WHERE booking_id = $1', [bookingId]);
+    // Demo refund for paid tickets, in the same transaction as the cancellation.
+    const refund = await tx.query<{ amount_cents: number; receipt_no: string }>(
+      `UPDATE payments SET status = 'refunded', refunded_at = now() WHERE booking_id = $1 AND status = 'paid' RETURNING amount_cents, receipt_no`,
+      [bookingId]
+    );
+    if (refund.rows[0]) {
+      await writeAudit(
+        { action: 'PAYMENT_REFUNDED', actor: actorOf(user), eventId: booking.event_id, targetType: 'booking', targetId: bookingId, details: refund.rows[0] },
+        tx
+      );
+      await notify(
+        { userId: user.id, type: 'booking_cancelled', title: `Refund issued: ${formatINR(refund.rows[0].amount_cents)}`, body: `Receipt ${refund.rows[0].receipt_no} (demo refund).`, link: `/tickets/${bookingId}` },
+        tx
+      );
+    }
     await writeAudit(
       {
         action: 'BOOKING_CANCELLED',
@@ -515,6 +599,8 @@ export type BookingView = {
   checked_in_at: Date | null;
   seats: string[];
   can_cancel: boolean;
+  paid_cents: number | null;
+  payment_status: 'paid' | 'refunded' | null;
 };
 
 export async function listMyBookings(user: CurrentUser): Promise<BookingView[]> {
@@ -523,13 +609,18 @@ export async function listMyBookings(user: CurrentUser): Promise<BookingView[]> 
     `SELECT b.id, b.event_id, e.name AS event_name, e.event_date, e.venue, b.status,
             b.created_at, b.cancelled_at, b.checked_in_at,
             array_agg(s.seat_number ORDER BY s.row_label, s.seat_index) AS seats,
-            (b.status = 'confirmed' AND b.checked_in_at IS NULL AND e.event_date > now()) AS can_cancel
+            (b.status = 'confirmed' AND b.checked_in_at IS NULL AND e.event_date > now()) AS can_cancel,
+            pay.amount_cents AS paid_cents, pay.status AS payment_status
        FROM bookings b
        JOIN events e ON e.id = b.event_id
        JOIN booking_seats bs ON bs.booking_id = b.id
        JOIN seats s ON s.id = bs.seat_id
+       LEFT JOIN LATERAL (
+         SELECT p.amount_cents, p.status FROM payments p
+          WHERE p.booking_id = b.id AND p.status IN ('paid', 'refunded') LIMIT 1
+       ) pay ON TRUE
       WHERE b.user_id = $1
-      GROUP BY b.id, e.id
+      GROUP BY b.id, e.id, pay.amount_cents, pay.status
       ORDER BY b.status, e.event_date, b.created_at DESC`,
     [user.id]
   );

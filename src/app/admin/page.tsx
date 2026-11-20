@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { requireUser, guard } from '@/lib/page';
 import { getAdminDashboard } from '@/lib/services/dashboard';
+import { formatINR } from '@/lib/services/payments';
 import { fmtTimeSeconds } from '@/lib/time';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,13 @@ export default async function AdminDashboardPage() {
         <StatCard label="Seats sold" value={d.kpi.seatsSold} icon={ArmchairIcon} hint={`${fill}% of ${d.kpi.capacity} capacity`}>
           <Progress value={fill} className="mt-1" />
         </StatCard>
-        <StatCard label="Bookings" value={d.kpi.bookings} icon={TicketIcon} tone="success" hint={`${d.kpi.bookingsToday} today · ${d.kpi.checkedIn} checked in`} />
+        <StatCard
+          label="Revenue (demo)"
+          value={formatINR(d.kpi.revenueCents)}
+          icon={TicketIcon}
+          tone="success"
+          hint={`${d.kpi.bookings} bookings · ${d.kpi.bookingsToday} today · ${d.kpi.checkedIn} checked in`}
+        />
         <StatCard label="Active holds" value={d.kpi.activeHolds} icon={TimerIcon} tone="warning" hint="expire after 5 minutes" />
         <StatCard
           label="Security events (24h)"

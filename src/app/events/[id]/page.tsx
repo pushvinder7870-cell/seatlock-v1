@@ -5,6 +5,8 @@ import {
   MapPinIcon,
   PencilIcon,
   ScrollTextIcon,
+  ShoppingCartIcon,
+  TagIcon,
   TicketCheckIcon,
   TicketIcon,
   UserRoundIcon,
@@ -12,6 +14,7 @@ import {
 } from 'lucide-react';
 import { requireUser, guard } from '@/lib/page';
 import { getSeatMap, MAX_SEATS_PER_STUDENT } from '@/lib/services/events';
+import { computeAmounts, formatINR } from '@/lib/services/payments';
 import { dateParts } from '@/lib/time';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -105,12 +108,20 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                     <FormMeta user={user} redirect={`/events/${id}`} />
                     <SubmitButton variant="ghost">Release</SubmitButton>
                   </ActionForm>
-                  <ActionForm action={`/api/holds/${myHold.id}/confirm`}>
-                    <FormMeta user={user} redirect="/my/bookings" />
-                    <SubmitButton size="lg" className="h-10 px-4">
-                      <TicketCheckIcon /> Confirm booking
-                    </SubmitButton>
-                  </ActionForm>
+                  {event.price_cents > 0 ? (
+                    <Button size="lg" className="h-10 px-4" asChild data-tour="checkout">
+                      <Link href={`/checkout/${myHold.id}`}>
+                        <ShoppingCartIcon /> Checkout · {formatINR(computeAmounts(event.price_cents, myHold.seats.length).total)}
+                      </Link>
+                    </Button>
+                  ) : (
+                    <ActionForm action={`/api/holds/${myHold.id}/confirm`}>
+                      <FormMeta user={user} redirect="/my/bookings" />
+                      <SubmitButton size="lg" className="h-10 px-4">
+                        <TicketCheckIcon /> Confirm booking
+                      </SubmitButton>
+                    </ActionForm>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -185,6 +196,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             <CardContent className="space-y-3 text-sm">
               {(
                 [
+                  [TagIcon, event.price_cents > 0 ? `${formatINR(event.price_cents)} per seat (+2% fee)` : 'Free entry'],
                   [CalendarIcon, p.long],
                   [ClockIcon, `Doors ${p.time}`],
                   [MapPinIcon, event.venue ?? 'TBA'],

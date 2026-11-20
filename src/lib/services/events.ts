@@ -26,6 +26,7 @@ export type EventRow = {
   version: number;
   updated_at: Date;
   image_url: string | null;
+  price_cents: number;
 };
 
 export type EventSummary = EventRow & {
@@ -58,7 +59,7 @@ export function isBookingOpen(e: Pick<EventRow, 'status' | 'event_date'>) {
 
 const EVENT_COLUMNS = `
   e.id, e.organizer_id, o.name AS organizer_name, e.name, e.description, e.venue,
-  e.event_date, e.status, e.total_seats, e.version, e.updated_at, e.image_url`;
+  e.event_date, e.status, e.total_seats, e.version, e.updated_at, e.image_url, e.price_cents`;
 
 async function loadEvent(eventId: string): Promise<EventRow | undefined> {
   assertUuid(eventId, 'event');
@@ -198,6 +199,8 @@ export type EventInput = {
   eventDate: string;
   status: EventStatus;
   imageUrl?: string;
+  /** Ticket price in rupees (0 = free). */
+  priceRupees?: string | number;
 };
 
 function validateEventInput(input: EventInput) {
@@ -206,7 +209,13 @@ function validateEventInput(input: EventInput) {
   const date = parseLocal(input.eventDate ?? '');
   if (Number.isNaN(date.getTime())) throw new ValidationError('A valid event date/time is required.');
   if (!['draft', 'published', 'cancelled'].includes(input.status)) throw new ValidationError('Invalid status.');
+  // Empty/missing price → null = "keep current" on edit, "free" on create.
+  const priceRaw = String(input.priceRupees ?? '').trim();
+  if (priceRaw && (!/^\d{1,6}(\.\d{1,2})?$/.test(priceRaw) || Number(priceRaw) > 100000)) {
+    throw new ValidationError('Ticket price must be between ₹0 and ₹1,00,000 (up to 2 decimals).');
+  }
   return {
+    price_cents: priceRaw ? Math.round(Number(priceRaw) * 100) : null,
     name,
     description: (input.description ?? '').trim() || null,
     venue: (input.venue ?? '').trim() || null,
@@ -229,9 +238,9 @@ export async function createEvent(
 
   return withTransaction(async (tx) => {
     const { rows: ev } = await tx.query<{ id: string }>(
-      `INSERT INTO events (organizer_id, name, description, venue, event_date, status, total_seats, image_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [user.id, v.name, v.description, v.venue, v.event_date, v.status, rows * perRow, v.image_url]
+      `INSERT INTO events (organizer_id, name, description, venue, event_date, status, total_seats, image_url, price_cents)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [user.id, v.name, v.description, v.venue, v.event_date, v.status, rows * perRow, v.image_url, v.price_cents ?? 0]
     );
     const id = ev[0].id;
     await tx.query(
@@ -262,17 +271,18 @@ export async function createEvent(
  */
 export async function updateEvent(user: CurrentUser, eventId: string, input: EventInput, expectedVersion: number) {
   const current = await getOwnedEvent(user, eventId, 'updateEvent');
-  const v = validateEventInput(input);
+  const parsed = validateEventInput(input);
+  const v = { ...parsed, price_cents: parsed.price_cents ?? current.price_cents };
   if (!Number.isInteger(expectedVersion)) throw new ValidationError('Missing version.');
 
   return withTransaction(async (tx) => {
     const { rows } = await tx.query<{ version: number }>(
       `UPDATE events
-          SET name = $3, description = $4, venue = $5, event_date = $6, status = $7, image_url = $8,
+          SET name = $3, description = $4, venue = $5, event_date = $6, status = $7, image_url = $8, price_cents = $9,
               version = version + 1, updated_at = now()
         WHERE id = $1 AND version = $2
         RETURNING version`,
-      [eventId, expectedVersion, v.name, v.description, v.venue, v.event_date, v.status, v.image_url]
+      [eventId, expectedVersion, v.name, v.description, v.venue, v.event_date, v.status, v.image_url, v.price_cents]
     );
     if (!rows[0]) {
       const latest = await tx.query<{ version: number }>('SELECT version FROM events WHERE id = $1', [eventId]);
@@ -291,6 +301,7 @@ export async function updateEvent(user: CurrentUser, eventId: string, input: Eve
       event_date: new Date(current.event_date).toISOString(),
       status: current.status,
       image_url: current.image_url,
+      price_cents: current.price_cents,
     };
     const after: Record<string, unknown> = { ...v, event_date: v.event_date.toISOString() };
     for (const k of Object.keys(after)) if (before[k] !== after[k]) changes[k] = { from: before[k], to: after[k] };

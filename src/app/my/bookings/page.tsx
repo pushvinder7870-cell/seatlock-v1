@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { CalendarDaysIcon, CheckCircle2Icon, ClockIcon, MapPinIcon, TicketIcon, XIcon } from 'lucide-react';
 import { requireUser, guard } from '@/lib/page';
 import { listMyBookings, type BookingView } from '@/lib/services/booking';
+import { formatINR } from '@/lib/services/payments';
 import { dateParts } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,15 @@ function Ticket({ b, user }: { b: BookingView; user: CurrentUser }) {
         <div className="text-[10px] tracking-widest text-muted-foreground uppercase">Admit</div>
         <div className="text-2xl font-semibold tabular-nums">{b.seats.length}</div>
         <div className="font-mono text-[10px] text-muted-foreground">#{b.id.slice(0, 8).toUpperCase()}</div>
+        {b.paid_cents != null && (
+          <div className={cn('text-xs font-medium', b.payment_status === 'refunded' ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary')}>
+            {b.payment_status === 'refunded' ? 'Refunded ' : 'Paid '}
+            {formatINR(b.paid_cents)}
+          </div>
+        )}
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/tickets/${b.id}`}>View ticket</Link>
+        </Button>
         {b.can_cancel && (
           <ActionForm action={`/api/bookings/${b.id}/cancel`} confirm={`Cancel your booking for ${b.event_name} (${b.seats.join(', ')})?`}>
             <FormMeta user={user} redirect="/my/bookings" />

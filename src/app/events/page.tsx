@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { requireUser, guard } from '@/lib/page';
 import { listEvents, type EventSummary } from '@/lib/services/events';
+import { formatINR } from '@/lib/services/payments';
 import { dateParts } from '@/lib/time';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -80,6 +81,9 @@ function EventCard({ e, showOrganizer }: { e: EventSummary; showOrganizer: boole
             <div className="mt-3 flex flex-wrap gap-1.5">
               {e.status !== 'published' && <StatusBadge status={e.status} />}
               {e.booking_open ? <StatusBadge status="open">Booking open</StatusBadge> : <StatusBadge status="closed">Booking closed</StatusBadge>}
+              <StatusBadge status={e.price_cents ? 'price' : 'free'} className={e.price_cents ? 'bg-primary/10 text-primary' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'}>
+                {e.price_cents ? formatINR(e.price_cents) : 'Free'}
+              </StatusBadge>
               {fast && <StatusBadge status="selling fast">Selling fast</StatusBadge>}
               {sold && <StatusBadge status="sold out">Sold out</StatusBadge>}
             </div>

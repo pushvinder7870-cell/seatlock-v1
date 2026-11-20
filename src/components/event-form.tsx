@@ -70,13 +70,25 @@ export function EventForm({ user, event }: { user: CurrentUser; event?: EventRow
               <Input id="eventDate" name="eventDate" type="datetime-local" required defaultValue={event ? toLocalInput(event.event_date) : undefined} />
             </Field>
           </div>
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <Field id="status" label="Status">
               <NativeSelect id="status" name="status" defaultValue={event?.status ?? 'draft'}>
                 <option value="draft">Draft (hidden)</option>
                 <option value="published">Published</option>
                 <option value="cancelled">Cancelled</option>
               </NativeSelect>
+            </Field>
+            <Field id="priceRupees" label="Ticket price (₹)" hint="0 = free. Students pay at a demo checkout.">
+              <Input
+                id="priceRupees"
+                name="priceRupees"
+                type="number"
+                min={0}
+                max={100000}
+                step="1"
+                defaultValue={event ? event.price_cents / 100 : 0}
+                required
+              />
             </Field>
             {!event && (
               <>

@@ -10,7 +10,7 @@ const BUCKET_SECONDS = 15 * 60;
 const BUCKETS = 24; // 6 hours
 
 export type AdminDashboard = {
-  kpi: { users: number; bookings: number; bookingsToday: number; activeHolds: number; checkedIn: number; seatsSold: number; capacity: number; denied24h: number; failedLogins24h: number };
+  kpi: { users: number; bookings: number; bookingsToday: number; activeHolds: number; checkedIn: number; revenueCents: number; seatsSold: number; capacity: number; denied24h: number; failedLogins24h: number };
   hourly: { hour: string; holds: number; bookings: number; rejected: number; denied: number }[];
   occupancy: { event: string; booked: number; held: number; available: number; blocked: number }[];
   shards: { shard: string; total: number; last24: number }[];
@@ -29,12 +29,13 @@ export async function getAdminDashboard(user: CurrentUser): Promise<AdminDashboa
 
   const [events, kpiRes, shardRes, hourlyRes, denied, failed] = await Promise.all([
     listEvents(user),
-    pool.query<{ users: number; bookings: number; bookings_today: number; active_holds: number; checked_in: number }>(`
+    pool.query<{ users: number; bookings: number; bookings_today: number; active_holds: number; checked_in: number; revenue: number }>(`
       SELECT (SELECT count(*) FROM users)::int AS users,
              (SELECT count(*) FROM bookings WHERE status = 'confirmed')::int AS bookings,
              (SELECT count(*) FROM bookings WHERE created_at >= date_trunc('day', now() AT TIME ZONE $1) AT TIME ZONE $1)::int AS bookings_today,
              (SELECT count(*) FROM holds WHERE status = 'active' AND expires_at > now())::int AS active_holds,
-             (SELECT count(*) FROM bookings WHERE status = 'confirmed' AND checked_in_at IS NOT NULL)::int AS checked_in`, [APP_TIME_ZONE]),
+             (SELECT count(*) FROM bookings WHERE status = 'confirmed' AND checked_in_at IS NOT NULL)::int AS checked_in,
+             (SELECT coalesce(sum(amount_cents), 0) FROM payments WHERE status = 'paid')::int AS revenue`, [APP_TIME_ZONE]),
     Promise.all(
       shardIds.map((s) =>
         pool.query<{ total: number; last24: number }>(
@@ -100,6 +101,7 @@ export async function getAdminDashboard(user: CurrentUser): Promise<AdminDashboa
       bookingsToday: k.bookings_today,
       activeHolds: k.active_holds,
       checkedIn: k.checked_in,
+      revenueCents: k.revenue,
       seatsSold,
       capacity,
       denied24h: actionTotals.get('ACCESS_DENIED') ?? 0,

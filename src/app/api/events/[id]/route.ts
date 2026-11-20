@@ -17,6 +17,7 @@ export const POST = apiRoute<P>(async ({ user, params, body }) => {
       eventDate: str(body, 'eventDate'),
       status: str(body, 'status') as EventStatus,
       imageUrl: str(body, 'imageUrl') || undefined,
+      priceRupees: str(body, 'priceRupees'),
     },
     Number(str(body, 'version'))
   );

@@ -33,6 +33,7 @@ export const ROUTE_RULES: RouteRule[] = [
 
   // Student: hold / confirm / cancel / my bookings
   { pattern: /^\/my(\/|$)/, roles: ['student'] },
+  { pattern: /^\/checkout(\/|$)/, roles: ['student'] },
   { pattern: /^\/api\/my(\/|$)/, roles: ['student'] },
   { pattern: new RegExp(`^/api/events/${UUID}/hold$`), roles: ['student'] },
   { pattern: /^\/api\/holds(\/|$)/, roles: ['student'] },
