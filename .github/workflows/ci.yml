@@ -1,0 +1,47 @@
+# On every push / PR: typecheck, lint, build, then boot the app against a real
+# PostgreSQL 16 and run the concurrency load test. A double booking fails the build.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-load-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: seatlock
+          POSTGRES_PASSWORD: seatlock_password
+          POSTGRES_DB: seatlock
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U seatlock -d seatlock"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://seatlock:seatlock_password@localhost:5432/seatlock
+      JWT_SECRET: ci-only-secret-not-used-anywhere-else
+      COOKIE_SECURE: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run db:init
+      - run: npm run build
+      - name: Start app
+        run: |
+          npx next start -p 3000 > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3000/api/health && break; sleep 1; done
+      - name: Concurrency load test (60 students)
+        run: node scripts/load-test.mjs --base http://localhost:3000 --students 60
+      - name: Server log
+        if: always()
+        run: cat server.log || true

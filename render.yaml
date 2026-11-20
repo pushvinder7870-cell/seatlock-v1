@@ -1,0 +1,27 @@
+# Render Blueprint: one-click deploy of the app + a managed PostgreSQL 16.
+# Render dashboard → New → Blueprint → pick this repo.
+# The container loads db/init.sql automatically on first boot (empty database).
+databases:
+  - name: seatlock-db
+    databaseName: seatlock
+    user: seatlock
+    postgresMajorVersion: "16"
+    plan: free
+
+services:
+  - type: web
+    name: seatlock
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: seatlock-db
+          property: connectionString   # internal URL (private network, no TLS needed)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_TIME_ZONE
+        value: Asia/Kolkata
+      - key: DB_POOL_MAX
+        value: "10"

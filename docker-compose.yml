@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: seatlock-db
+    environment:
+      POSTGRES_USER: seatlock
+      POSTGRES_PASSWORD: seatlock_password
+      POSTGRES_DB: seatlock
+    ports:
+      - "5432:5432"
+    volumes:
+      # Schema + seed data, applied on first start (empty data volume).
+      # Re-seed with: docker compose down -v && docker compose up
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: ["postgres", "-c", "max_connections=200"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seatlock -d seatlock"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: seatlock-app
+    environment:
+      DATABASE_URL: postgresql://seatlock:seatlock_password@db:5432/seatlock
+      JWT_SECRET: ${JWT_SECRET:-seatlock-docker-demo-secret-change-me-2026}
+      # Demo runs over plain http://localhost; set to "true" behind HTTPS.
+      COOKIE_SECURE: "false"
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Kolkata}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
